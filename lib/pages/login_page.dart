@@ -1,6 +1,8 @@
-
 import 'package:flutter/material.dart';
+
+import '../services/api_service.dart';
 import 'main_navigation_page.dart';
+import 'register_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -19,6 +21,7 @@ class _LoginPageState extends State<LoginPage> {
       TextEditingController();
 
   bool masquerMotDePasse = true;
+  bool chargement = false;
 
   @override
   void dispose() {
@@ -27,14 +30,41 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  void seConnecter() {
-    if (_formKey.currentState!.validate()) {
+  /// Connexion via POST /accounts/login.
+  Future<void> seConnecter() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => chargement = true);
+    try {
+      await ApiService.login(
+        identifiantController.text.trim(),
+        passwordController.text,
+      );
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => const MainNavigationPage(),
         ),
       );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.details), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) setState(() => chargement = false);
+    }
+  }
+
+  Future<void> ouvrirInscription() async {
+    final email = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (context) => const RegisterPage()),
+    );
+    if (email != null) {
+      identifiantController.text = email;
+      passwordController.clear();
     }
   }
 
@@ -77,16 +107,17 @@ class _LoginPageState extends State<LoginPage> {
 
                 TextFormField(
                   controller: identifiantController,
+                  keyboardType: TextInputType.emailAddress,
                   decoration: InputDecoration(
-                    labelText: 'Identifiant',
-                    prefixIcon: const Icon(Icons.person),
+                    labelText: 'Email',
+                    prefixIcon: const Icon(Icons.email),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Veuillez saisir votre identifiant';
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Veuillez saisir votre email';
                     }
                     return null;
                   },
@@ -97,6 +128,7 @@ class _LoginPageState extends State<LoginPage> {
                 TextFormField(
                   controller: passwordController,
                   obscureText: masquerMotDePasse,
+                  onFieldSubmitted: (_) => chargement ? null : seConnecter(),
                   decoration: InputDecoration(
                     labelText: 'Mot de passe',
                     prefixIcon: const Icon(Icons.lock),
@@ -130,7 +162,7 @@ class _LoginPageState extends State<LoginPage> {
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
-                    onPressed: seConnecter,
+                    onPressed: chargement ? null : seConnecter,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
@@ -138,17 +170,33 @@ class _LoginPageState extends State<LoginPage> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text(
-                      'SE CONNECTER',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    child: chargement
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.5,
+                            ),
+                          )
+                        : const Text(
+                            'SE CONNECTER',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                   ),
                 ),
 
-                const SizedBox(height: 25),
+                const SizedBox(height: 10),
+
+                TextButton(
+                  onPressed: chargement ? null : ouvrirInscription,
+                  child: const Text('Pas encore de compte ? Créer un compte'),
+                ),
+
+                const SizedBox(height: 15),
 
                 const Text(
                   'CV PROFESSIONNEL - CONSTANTIN',
